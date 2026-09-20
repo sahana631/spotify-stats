@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Spotify Stats</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            background: #1B0E2B;
+            color: #ffffff;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .blob-1 {
+            position: fixed;
+            top: -80px;
+            right: -120px;
+            width: 480px;
+            height: 340px;
+            background: #FF4D6D;
+            transform: rotate(18deg);
+            z-index: 0;
+        }
+
+        .blob-2 {
+            position: fixed;
+            bottom: -100px;
+            left: -80px;
+            width: 360px;
+            height: 260px;
+            background: #FFE066;
+            transform: rotate(-12deg);
+            z-index: 0;
+        }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 56px 32px;
+        }
+
+        .eyebrow {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            color: #FFE066;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            margin: 6px 0 28px 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+
+        select {
+            font-size: 14px;
+            font-weight: 600;
+            color: #FFFFFF;
+            background: transparent;
+            border: 2px solid #FFFFFF;
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            appearance: none;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #FFE066;
+            color: #FFE066;
+        }
+
+        button {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1B0E2B;
+            background: #FFFFFF;
+            border: 2px solid #1B0E2B;
+            border-radius: 8px;
+            padding: 8px 20px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        button:hover {
+            transform: scale(1.04);
+        }
+
+        #results {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .item {
+            border: 2px solid #1B0E2B;
+            border-radius: 6px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .rank {
+            font-size: 30px;
+            font-weight: 700;
+            color: #1B0E2B;
+            line-height: 1;
+        }
+
+        .item-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1B0E2B;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .item-subtitle {
+            font-size: 13px;
+            font-weight: 400;
+            color: #1B0E2B;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .empty, .loading {
+            grid-column: 1 / -1;
+            font-size: 14px;
+            font-weight: 600;
+            color: #FFE066;
+            padding: 20px 0;
+        }
+
+        .taste-section {
+            margin-top: 48px;
+        }
+
+        .taste-heading {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="blob-1"></div>
+    <div class="blob-2"></div>
+
+    <div class="page">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+            <a href="/logout" style="font-size: 13px; font-weight: 600; color: #1B0E2B; background: #FFFFFF; border: 2px solid #1B0E2B; border-radius: 8px; padding: 6px 16px; text-decoration: none;">Log out</a>
+        </div>
+
+        <span class="eyebrow">On Repeat</span>
+        <h1>Top Tracks</h1>
+
+        <div class="controls">
+            <select id="category">
+                <option value="tracks">Tracks</option>
+                <option value="artists">Artists</option>
+                <option value="albums">Albums</option>
+            </select>
+
+            <select id="time_range">
+                <option value="short_term">4 Weeks</option>
+                <option value="medium_term" selected>6 Months</option>
+                <option value="long_term">All Time</option>
+            </select>
+
+            <button onclick="loadData()">Load</button>
+        </div>
+
+        <div id="results">
+            <p class="empty">Pick a category and hit load.</p>
+        </div>
+
+        <div class="taste-section">
+            <span class="eyebrow">Then vs Now</span>
+            <h1 style="font-size: 32px;">Taste Change</h1>
+        
+            <div style="display: flex; gap: 10px; margin-bottom: 24px;">
+                <select id="taste_category">
+                    <option value="tracks">Tracks</option>
+                    <option value="artists">Artists</option>
+                    <option value="albums">Albums</option>
+                </select>
+                <button onclick="loadTasteChange()">Compare</button>
+            </div>
+        
+            <div id="taste-results"></div>
+        </div>
+    </div>
+
+    <script>
+        const cardColors = ["#FFE066", "#FF4D6D", "#FFFFFF", "#2FE6C4"];
+
+        async function loadData() {
+            const category = document.getElementById("category").value;
+            const timeRange = document.getElementById("time_range").value;
+            const list = document.getElementById("results");
+
+            list.innerHTML = '<p class="loading">Loading...</p>';
+
+            const response = await fetch(`/api/data?category=${category}&time_range=${timeRange}&limit=50`);
+            const data = await response.json();
+
+            list.innerHTML = "";
+
+            if (data.length === 0) {
+                list.innerHTML = '<p class="empty">Nothing found.</p>';
+                return;
+            }
+
+            data.forEach((item, index) => {
+                const card = document.createElement("div");
+                card.className = "item";
+                card.style.background = cardColors[index % cardColors.length];
+
+                let title = "";
+                let subtitle = "";
+                let image = "";
+
+                if (category === "tracks") {
+                    title = item.name;
+                    subtitle = item.artist;
+                    image = item.image;
+                } else if (category === "artists") {
+                    title = item.name;
+                    subtitle = "";
+                    image = item.image;
+                } else if (category === "albums") {
+                    title = item.name;
+                    subtitle = `${item.count} track${item.count !== 1 ? "s" : ""}`;
+                    image = item.image;
+                }
+
+                card.innerHTML = `
+                    ${image ? `<img src="${image}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; margin-bottom: 8px;">` : ""}
+                    <span class="rank">${String(index + 1).padStart(2, "0")}</span>
+                    <span class="item-title">${title}</span>
+                    ${subtitle ? `<span class="item-subtitle">${subtitle}</span>` : ""}
+                `;
+
+                list.appendChild(card);
+            });
+        }
+
+        async function loadTasteChange() {
+            const category = document.getElementById("taste_category").value;
+            const container = document.getElementById("taste-results");
+            container.innerHTML = '<p class="loading">Loading...</p>';
+
+            const response = await fetch(`/api/taste-change?category=${category}`);
+            const data = await response.json();
+
+            container.innerHTML = "";
+
+            const sections = [
+                { key: "new_in_rotation", label: "New In Rotation", color: "#2FE6C4" },
+                { key: "longtime_favorites", label: "Longtime Favorites", color: "#FFE066" },
+                { key: "faded_out", label: "Faded Out", color: "#FF4D6D" }
+            ];
+
+            sections.forEach(section => {
+                const items = data[section.key];
+                if (!items || items.length === 0) return;
+
+                const heading = document.createElement("h2");
+                heading.className = "taste-heading";
+                heading.textContent = `${section.label} (${items.length})`;
+                container.appendChild(heading);
+
+                const grid = document.createElement("div");
+                grid.style.display = "grid";
+                grid.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+                grid.style.gap = "10px";
+
+                items.slice(0, 6).forEach(item => {
+                    const card = document.createElement("div");
+                    card.className = "item";
+                    card.style.background = section.color;
+
+                    let title = "";
+                    let subtitle = "";
+
+                    if (category === "tracks") {
+                        title = item.name;
+                        subtitle = item.artist;
+                    } else if (category === "artists") {
+                        title = item.name;
+                        subtitle = "";
+                    } else if (category === "albums") {
+                        title = item.name;
+                        subtitle = `${item.count} track${item.count !== 1 ? "s" : ""}`;
+                    }
+
+                    card.innerHTML = `
+                        ${item.image ? `<img src="${item.image}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; margin-bottom: 8px;">` : ""}
+                        <span class="item-title">${title}</span>
+                        ${subtitle ? `<span class="item-subtitle">${subtitle}</span>` : ""}
+                    `;
+                    grid.appendChild(card);
+                });
+
+                container.appendChild(grid);
+            });
+        }
+    </script>
+</body>
+</html>
